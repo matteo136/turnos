@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Turnos</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E✂️%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="brand">
+        <span class="logo">✂️</span>
+        <div>
+          <h1 id="nombre-negocio">Turnos</h1>
+          <p>Reservá tu turno online</p>
+        </div>
+      </div>
+      <div id="sesion" class="sesion" hidden>
+        <span id="saludo"></span>
+        <button id="btn-salir" class="btn btn-claro" type="button">Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div id="toast" class="toast" role="status" hidden></div>
+
+    <div id="banner-local" class="banner" hidden>
+      <strong>Abriste el archivo directamente.</strong>
+      Así no funciona. Dejá la app corriendo con <code>python app.py</code> y abrí
+      <a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>.
+    </div>
+
+    <noscript><div class="banner">Activá JavaScript para usar la página.</div></noscript>
+
+    <!-- Ingreso / registro -->
+    <section id="vista-auth" class="card card-auth">
+      <div class="tabs">
+        <button id="tab-login" class="tab activa" type="button">Ingresar</button>
+        <button id="tab-registro" class="tab" type="button">Crear cuenta</button>
+      </div>
+      <form id="form-auth">
+        <div id="campos-registro" hidden>
+          <label>Nombre
+            <input id="nombre" type="text" autocomplete="name" placeholder="Tu nombre">
+          </label>
+          <label>Teléfono
+            <input id="telefono" type="tel" autocomplete="tel" placeholder="Ej: 298 1234567">
+          </label>
+        </div>
+        <label>Correo
+          <input id="email" type="email" autocomplete="email" placeholder="tu@correo.com" required>
+        </label>
+        <label>Contraseña
+          <span class="pass">
+            <input id="password" type="password" minlength="6" autocomplete="current-password"
+                   placeholder="Mínimo 6 caracteres" required>
+            <button id="btn-ver-pass" class="btn-ojo" type="button" aria-label="Mostrar contraseña">👁</button>
+          </span>
+        </label>
+        <button id="btn-auth" class="btn btn-principal btn-ancho" type="submit">Ingresar</button>
+      </form>
+    </section>
+
+    <!-- Cliente -->
+    <div id="vista-cliente" hidden>
+      <section class="card">
+        <h2>Reservar turno</h2>
+
+        <div class="paso"><span class="num">1</span> Servicio</div>
+        <select id="servicio" aria-label="Servicio"></select>
+
+        <div class="paso"><span class="num">2</span> Profesional</div>
+        <select id="profesional" aria-label="Profesional"></select>
+
+        <div class="paso"><span class="num">3</span> Fecha</div>
+        <input id="fecha" type="date" aria-label="Fecha">
+
+        <div class="paso"><span class="num">4</span> Horario</div>
+        <div id="horarios" class="chips"></div>
+
+        <div id="confirmar-caja" class="resumen" hidden>
+          <p id="resumen"></p>
+          <button id="btn-confirmar" class="btn btn-principal btn-ancho" type="button">Confirmar turno</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Mis turnos</h2>
+        <h3 class="subtitulo">Próximos</h3>
+        <div id="proximos"></div>
+        <h3 class="subtitulo">Anteriores</h3>
+        <div id="anteriores"></div>
+      </section>
+    </div>
+
+    <!-- Administrador -->
+    <div id="vista-admin" hidden>
+      <section class="card">
+        <h2>Agenda del día</h2>
+        <div class="fila-fecha">
+          <input id="fecha-admin" type="date" aria-label="Fecha de la agenda">
+          <button id="btn-agenda" class="btn btn-principal" type="button">Ver agenda</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong id="stat-total">0</strong><span>Turnos</span></div>
+          <div class="stat"><strong id="stat-reservados">0</strong><span>Reservados</span></div>
+          <div class="stat"><strong id="stat-completados">0</strong><span>Completados</span></div>
+        </div>
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Profesional</th><th>Estado</th></tr>
+            </thead>
+            <tbody id="agenda"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Servicios</h2>
+        <div id="lista-servicios"></div>
+        <h3 class="subtitulo">Nuevo servicio</h3>
+        <form id="form-servicio">
+          <label>Nombre <input id="srv-nombre" type="text" required></label>
+          <label>Duración (minutos) <input id="srv-duracion" type="number" min="5" step="5" required></label>
+          <label>Precio <input id="srv-precio" type="number" min="0" step="100"></label>
+          <button class="btn btn-principal btn-ancho" type="submit">Agregar servicio</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer>Sistema de turnos online · General Roca, Río Negro</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
