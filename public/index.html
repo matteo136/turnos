@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Turnos</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E✂️%3C/text%3E%3C/svg%3E">
+  <title>Barbería 67</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💈%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-in">
       <div class="brand">
-        <span class="logo">✂️</span>
+        <span class="logo">💈</span>
         <div>
-          <h1 id="nombre-negocio">Turnos</h1>
+          <h1 id="nombre-negocio">Barbería 67</h1>
           <p>Reservá tu turno online</p>
         </div>
       </div>
@@ -22,6 +22,7 @@
         <button id="btn-salir" class="btn btn-claro" type="button">Salir</button>
       </div>
     </div>
+    <div class="poste"></div>
   </header>
 
   <main>
@@ -29,7 +30,7 @@
 
     <div id="banner-local" class="banner" hidden>
       <strong>Abriste el archivo directamente.</strong>
-      Así no funciona. Dejá la app corriendo con <code>python app.py</code> y abrí
+      Así no funciona. Dejá la app corriendo con <code>iniciar.bat</code> y abrí
       <a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>.
     </div>
 
@@ -37,6 +38,11 @@
 
     <!-- Ingreso / registro -->
     <section id="vista-auth" class="card card-auth">
+      <div class="bienvenida">
+        <span class="bienvenida-ico">✂️</span>
+        <h2>Bienvenido</h2>
+        <p>Reservá tu turno en 4 pasos, sin llamadas ni esperas.</p>
+      </div>
       <div class="tabs">
         <button id="tab-login" class="tab activa" type="button">Ingresar</button>
         <button id="tab-registro" class="tab" type="button">Crear cuenta</button>
@@ -66,19 +72,19 @@
 
     <!-- Cliente -->
     <div id="vista-cliente" hidden>
-      <section class="card">
-        <h2>Reservar turno</h2>
+      <section class="card card-rojo">
+        <h2>📅 Reservar turno</h2>
 
-        <div class="paso"><span class="num">1</span> Servicio</div>
+        <div class="paso p1"><span class="num">1</span> Servicio</div>
         <select id="servicio" aria-label="Servicio"></select>
 
-        <div class="paso"><span class="num">2</span> Profesional</div>
+        <div class="paso p2"><span class="num">2</span> Profesional</div>
         <select id="profesional" aria-label="Profesional"></select>
 
-        <div class="paso"><span class="num">3</span> Fecha</div>
+        <div class="paso p3"><span class="num">3</span> Fecha</div>
         <input id="fecha" type="date" aria-label="Fecha">
 
-        <div class="paso"><span class="num">4</span> Horario</div>
+        <div class="paso p4"><span class="num">4</span> Horario</div>
         <div id="horarios" class="chips"></div>
 
         <div id="confirmar-caja" class="resumen" hidden>
@@ -87,8 +93,8 @@
         </div>
       </section>
 
-      <section class="card">
-        <h2>Mis turnos</h2>
+      <section class="card card-azul">
+        <h2>🗓️ Mis turnos</h2>
         <h3 class="subtitulo">Próximos</h3>
         <div id="proximos"></div>
         <h3 class="subtitulo">Anteriores</h3>
@@ -98,16 +104,16 @@
 
     <!-- Administrador -->
     <div id="vista-admin" hidden>
-      <section class="card">
-        <h2>Agenda del día</h2>
+      <section class="card card-rojo">
+        <h2>📋 Agenda del día</h2>
         <div class="fila-fecha">
           <input id="fecha-admin" type="date" aria-label="Fecha de la agenda">
           <button id="btn-agenda" class="btn btn-principal" type="button">Ver agenda</button>
         </div>
         <div class="stats">
-          <div class="stat"><strong id="stat-total">0</strong><span>Turnos</span></div>
-          <div class="stat"><strong id="stat-reservados">0</strong><span>Reservados</span></div>
-          <div class="stat"><strong id="stat-completados">0</strong><span>Completados</span></div>
+          <div class="stat s-azul"><strong id="stat-total">0</strong><span>Turnos</span></div>
+          <div class="stat s-rojo"><strong id="stat-reservados">0</strong><span>Reservados</span></div>
+          <div class="stat s-verde"><strong id="stat-completados">0</strong><span>Completados</span></div>
         </div>
         <div class="tabla-scroll">
           <table>
@@ -119,21 +125,39 @@
         </div>
       </section>
 
-      <section class="card">
-        <h2>Servicios</h2>
+      <section class="card card-azul">
+        <h2>✂️ Servicios</h2>
+        <p class="ayuda">Editá el nombre, la duración y el precio. Si quitás un servicio, los clientes dejan de verlo, pero los turnos ya reservados se conservan.</p>
         <div id="lista-servicios"></div>
         <h3 class="subtitulo">Nuevo servicio</h3>
-        <form id="form-servicio">
-          <label>Nombre <input id="srv-nombre" type="text" required></label>
-          <label>Duración (minutos) <input id="srv-duracion" type="number" min="5" step="5" required></label>
-          <label>Precio <input id="srv-precio" type="number" min="0" step="100"></label>
+        <form id="form-servicio" class="form-nuevo">
+          <label>Nombre <input id="srv-nombre" type="text" placeholder="Ej: Corte fade" required></label>
+          <div class="dos">
+            <label>Duración (min) <input id="srv-duracion" type="number" min="5" step="5" required></label>
+            <label>Precio ($) <input id="srv-precio" type="number" min="0" step="100"></label>
+          </div>
           <button class="btn btn-principal btn-ancho" type="submit">Agregar servicio</button>
+        </form>
+      </section>
+
+      <section class="card card-dorado">
+        <h2>💈 Profesionales</h2>
+        <p class="ayuda">Editá el nombre y el horario de atención (lunes a sábado). Si quitás a un profesional, los clientes dejan de verlo.</p>
+        <div id="lista-profesionales"></div>
+        <h3 class="subtitulo">Nuevo profesional</h3>
+        <form id="form-profesional" class="form-nuevo">
+          <label>Nombre <input id="prof-nombre" type="text" placeholder="Ej: Lucas" required></label>
+          <div class="dos">
+            <label>Desde <input id="prof-desde" type="time" value="09:00" required></label>
+            <label>Hasta <input id="prof-hasta" type="time" value="18:00" required></label>
+          </div>
+          <button class="btn btn-principal btn-ancho" type="submit">Agregar profesional</button>
         </form>
       </section>
     </div>
   </main>
 
-  <footer>Sistema de turnos online · General Roca, Río Negro</footer>
+  <footer><span id="pie-nombre">Barbería 67</span> · General Roca, Río Negro</footer>
 
   <script src="app.js"></script>
 </body>

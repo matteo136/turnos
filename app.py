@@ -130,8 +130,9 @@ def calcular_horarios_libres(servicio_id, profesional_id, fecha):
         return []
     duracion = timedelta(minutes=servicio["duracion_min"])
     franjas = consultar(
-        "select hora_inicio, hora_fin from horarios_atencion "
-        "where profesional_id = %s and dia_semana = %s",
+        "select h.hora_inicio, h.hora_fin from horarios_atencion h "
+        "join profesionales p on p.id = h.profesional_id "
+        "where h.profesional_id = %s and h.dia_semana = %s and p.activo",
         (profesional_id, fecha.weekday()),
     )
     ocupados = consultar(
@@ -253,6 +254,135 @@ def crear_servicio(datos):
         "insert into servicios (nombre, duracion_min, precio) values (%s, %s, %s)",
         (nombre, duracion, precio),
     )
+    return None
+
+
+DIAS_ATENCION = range(0, 6)  # lunes (0) a sábado (5)
+
+
+def listar_servicios_admin():
+    return consultar("select id, nombre, duracion_min, precio, activo from servicios order by id")
+
+
+def actualizar_servicio(servicio_id, datos):
+    """Cambia nombre, duración, precio o si está activo. Devuelve un error o None."""
+    sets, valores = [], []
+    try:
+        if "nombre" in datos:
+            nombre = str(datos["nombre"]).strip()
+            if not nombre:
+                return "El nombre no puede estar vacío"
+            sets.append("nombre = %s")
+            valores.append(nombre)
+        if "duracion_min" in datos:
+            duracion = int(datos["duracion_min"])
+            if duracion <= 0:
+                return "La duración tiene que ser mayor a 0"
+            sets.append("duracion_min = %s")
+            valores.append(duracion)
+        if "precio" in datos:
+            precio = float(datos["precio"] or 0)
+            if precio < 0:
+                return "El precio no puede ser negativo"
+            sets.append("precio = %s")
+            valores.append(precio)
+        if "activo" in datos:
+            sets.append("activo = %s")
+            valores.append(bool(datos["activo"]))
+    except (ValueError, TypeError):
+        return "Datos inválidos"
+    if not sets:
+        return "No hay nada para cambiar"
+    valores.append(servicio_id)
+    fila = consultar(
+        "update servicios set " + ", ".join(sets) + " where id = %s returning id",
+        tuple(valores),
+        uno=True,
+    )
+    return None if fila else "El servicio no existe"
+
+
+def listar_profesionales_admin():
+    return consultar(
+        "select p.id, p.nombre, p.activo, "
+        "(select min(hora_inicio) from horarios_atencion where profesional_id = p.id) as hora_inicio, "
+        "(select max(hora_fin) from horarios_atencion where profesional_id = p.id) as hora_fin "
+        "from profesionales p order by p.id"
+    )
+
+
+def leer_hora(texto):
+    try:
+        return datetime.strptime(str(texto), "%H:%M").time()
+    except ValueError:
+        return None
+
+
+def crear_profesional(datos):
+    nombre = (datos.get("nombre") or "").strip()
+    inicio = leer_hora(datos.get("hora_inicio") or "09:00")
+    fin = leer_hora(datos.get("hora_fin") or "18:00")
+    if not nombre:
+        return "Poné el nombre del profesional"
+    if not inicio or not fin or inicio >= fin:
+        return "El horario de atención no es válido"
+    conn = conectar_db()
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute("insert into profesionales (nombre) values (%s) returning id", (nombre,))
+            profesional_id = cur.fetchone()["id"]
+            for dia in DIAS_ATENCION:
+                cur.execute(
+                    "insert into horarios_atencion (profesional_id, dia_semana, hora_inicio, hora_fin) "
+                    "values (%s, %s, %s, %s)",
+                    (profesional_id, dia, inicio, fin),
+                )
+    finally:
+        conn.close()
+    return None
+
+
+def actualizar_profesional(profesional_id, datos):
+    """Cambia nombre, si está activo y/o el horario (lunes a sábado)."""
+    sets, valores = [], []
+    if "nombre" in datos:
+        nombre = str(datos["nombre"]).strip()
+        if not nombre:
+            return "El nombre no puede estar vacío"
+        sets.append("nombre = %s")
+        valores.append(nombre)
+    if "activo" in datos:
+        sets.append("activo = %s")
+        valores.append(bool(datos["activo"]))
+    cambia_horario = "hora_inicio" in datos or "hora_fin" in datos
+    if cambia_horario:
+        inicio = leer_hora(datos.get("hora_inicio"))
+        fin = leer_hora(datos.get("hora_fin"))
+        if not inicio or not fin or inicio >= fin:
+            return "El horario de atención no es válido"
+    if not sets and not cambia_horario:
+        return "No hay nada para cambiar"
+    conn = conectar_db()
+    try:
+        with conn, conn.cursor() as cur:
+            cur.execute("select id from profesionales where id = %s", (profesional_id,))
+            if not cur.fetchone():
+                return "El profesional no existe"
+            if sets:
+                cur.execute(
+                    "update profesionales set " + ", ".join(sets) + " where id = %s",
+                    tuple(valores + [profesional_id]),
+                )
+            if cambia_horario:
+                cur.execute("delete from horarios_atencion where profesional_id = %s", (profesional_id,))
+                for dia in DIAS_ATENCION:
+                    cur.execute(
+                        "insert into horarios_atencion (profesional_id, dia_semana, hora_inicio, hora_fin) "
+                        "values (%s, %s, %s, %s)",
+                        (profesional_id, dia, inicio, fin),
+                    )
+    finally:
+        conn.close()
     return None
 
 
@@ -395,6 +525,45 @@ def ruta_crear_servicio():
     if error:
         return jsonify(error=error), 400
     return jsonify(ok=True), 201
+
+
+@app.get("/admin/servicios")
+@requiere_admin
+def ruta_servicios_admin():
+    return jsonify(limpiar(listar_servicios_admin()))
+
+
+@app.patch("/admin/servicios/<int:servicio_id>")
+@requiere_admin
+def ruta_editar_servicio(servicio_id):
+    error = actualizar_servicio(servicio_id, request.get_json(silent=True) or {})
+    if error:
+        return jsonify(error=error), 400
+    return jsonify(ok=True)
+
+
+@app.get("/admin/profesionales")
+@requiere_admin
+def ruta_profesionales_admin():
+    return jsonify(limpiar(listar_profesionales_admin()))
+
+
+@app.post("/admin/profesionales")
+@requiere_admin
+def ruta_crear_profesional():
+    error = crear_profesional(request.get_json(silent=True) or {})
+    if error:
+        return jsonify(error=error), 400
+    return jsonify(ok=True), 201
+
+
+@app.patch("/admin/profesionales/<int:profesional_id>")
+@requiere_admin
+def ruta_editar_profesional(profesional_id):
+    error = actualizar_profesional(profesional_id, request.get_json(silent=True) or {})
+    if error:
+        return jsonify(error=error), 400
+    return jsonify(ok=True)
 
 
 if __name__ == "__main__":

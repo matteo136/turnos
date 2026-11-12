@@ -1,4 +1,4 @@
-const NOMBRE_NEGOCIO = "Nombre del negocio"; // cambialo por el nombre del negocio
+const NOMBRE_NEGOCIO = "Barbería 67"; // nombre que se muestra en la página
 
 const $ = (id) => document.getElementById(id);
 const ESTADOS = ["reservado", "cancelado", "completado", "ausente"];
@@ -85,6 +85,7 @@ function mostrarVista(usuario) {
   if (esAdmin) {
     cargarAgenda();
     cargarServiciosAdmin();
+    cargarProfesionalesAdmin();
   } else {
     cargarCliente();
   }
@@ -177,7 +178,12 @@ async function cargarHorarios() {
   horaElegida = null;
   actualizarResumen();
   const caja = $("horarios");
-  if (!$("servicio").value || !$("profesional").value || !$("fecha").value) {
+  if (!$("servicio").value || !$("profesional").value) {
+    caja.innerHTML = "";
+    caja.appendChild(crear("p", "Por ahora no hay servicios o profesionales disponibles.", "vacio"));
+    return;
+  }
+  if (!$("fecha").value) {
     caja.innerHTML = "";
     return;
   }
@@ -346,27 +352,110 @@ async function cambiarEstado(id, estado) {
   cargarAgenda();
 }
 
+$("btn-agenda").addEventListener("click", cargarAgenda);
+
+// ---------- Administrador: servicios y profesionales ----------
+function campo(etiqueta, tipo, valor, extra = {}) {
+  const label = document.createElement("label");
+  label.appendChild(document.createTextNode(etiqueta));
+  const input = document.createElement("input");
+  input.type = tipo;
+  input.value = valor;
+  Object.assign(input, extra);
+  label.appendChild(input);
+  return { label, input };
+}
+
+function botonesEdicion(alCancelar) {
+  const botones = crear("div", "", "edicion-botones");
+  const guardar = crear("button", "Guardar", "btn btn-mini btn-principal");
+  guardar.type = "submit";
+  const cancelar = crear("button", "Cancelar", "btn btn-mini btn-gris");
+  cancelar.type = "button";
+  cancelar.addEventListener("click", alCancelar);
+  botones.appendChild(guardar);
+  botones.appendChild(cancelar);
+  return botones;
+}
+
+function dibujarItem(titulo, detalle, activo, alEditar, alAlternar) {
+  const fila = crear("div", "", "item" + (activo ? "" : " apagado"));
+  const info = crear("div", "", "item-info");
+  info.appendChild(crear("strong", titulo));
+  info.appendChild(crear("span", detalle + (activo ? "" : " · Quitado")));
+  fila.appendChild(info);
+
+  const acciones = crear("div", "", "item-acciones");
+  const editar = crear("button", "Editar", "btn btn-mini btn-azul");
+  editar.type = "button";
+  editar.addEventListener("click", () => alEditar(fila));
+  const alternar = crear("button", activo ? "Quitar" : "Activar", "btn btn-mini " + (activo ? "btn-rojo" : "btn-verde"));
+  alternar.type = "button";
+  alternar.addEventListener("click", alAlternar);
+  acciones.appendChild(editar);
+  acciones.appendChild(alternar);
+  fila.appendChild(acciones);
+  return fila;
+}
+
+// --- Servicios ---
+function dibujarServicio(s) {
+  return dibujarItem(
+    s.nombre,
+    `${s.duracion_min} min · $${s.precio}`,
+    s.activo,
+    (fila) => fila.replaceWith(formEditarServicio(s)),
+    () => {
+      if (s.activo && !confirm("¿Quitar este servicio? Los clientes dejarán de verlo, pero los turnos ya reservados se conservan.")) return;
+      cambiarServicio(s.id, { activo: !s.activo }, s.activo ? "Servicio quitado." : "Servicio activado.");
+    }
+  );
+}
+
+function formEditarServicio(s) {
+  const form = crear("form", "", "item item-edicion");
+  const campos = crear("div", "", "edicion-campos");
+  const nombre = campo("Nombre", "text", s.nombre, { required: true });
+  const duracion = campo("Duración (min)", "number", s.duracion_min, { required: true, min: 5, step: 5 });
+  const precio = campo("Precio ($)", "number", s.precio, { min: 0, step: 100 });
+  [nombre, duracion, precio].forEach((c) => campos.appendChild(c.label));
+  form.appendChild(campos);
+  form.appendChild(botonesEdicion(() => form.replaceWith(dibujarServicio(s))));
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    cambiarServicio(
+      s.id,
+      { nombre: nombre.input.value, duracion_min: duracion.input.value, precio: precio.input.value },
+      "Servicio actualizado."
+    );
+  });
+  return form;
+}
+
+async function cambiarServicio(id, datos, mensaje) {
+  try {
+    await api("/admin/servicios/" + id, { method: "PATCH", body: JSON.stringify(datos) });
+    aviso(mensaje);
+  } catch (err) {
+    aviso(err.message, true);
+  }
+  cargarServiciosAdmin();
+}
+
 async function cargarServiciosAdmin() {
   try {
-    const servicios = await api("/servicios");
+    const servicios = await api("/admin/servicios");
     const lista = $("lista-servicios");
     lista.innerHTML = "";
     if (!servicios.length) {
       lista.appendChild(crear("p", "Todavía no hay servicios cargados.", "vacio"));
       return;
     }
-    servicios.forEach((s) => {
-      const fila = crear("div", "", "servicio-item");
-      fila.appendChild(crear("strong", s.nombre));
-      fila.appendChild(crear("span", `${s.duracion_min} min · $${s.precio}`));
-      lista.appendChild(fila);
-    });
+    servicios.forEach((s) => lista.appendChild(dibujarServicio(s)));
   } catch (err) {
     aviso(err.message, true);
   }
 }
-
-$("btn-agenda").addEventListener("click", cargarAgenda);
 
 $("form-servicio").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -387,10 +476,92 @@ $("form-servicio").addEventListener("submit", async (e) => {
   }
 });
 
+// --- Profesionales ---
+function dibujarProfesional(p) {
+  const horario = p.hora_inicio && p.hora_fin
+    ? `Lun a sáb · ${p.hora_inicio} a ${p.hora_fin}`
+    : "Sin horario cargado";
+  return dibujarItem(
+    p.nombre,
+    horario,
+    p.activo,
+    (fila) => fila.replaceWith(formEditarProfesional(p)),
+    () => {
+      if (p.activo && !confirm("¿Quitar a este profesional? Los clientes dejarán de verlo, pero los turnos ya reservados se conservan.")) return;
+      cambiarProfesional(p.id, { activo: !p.activo }, p.activo ? "Profesional quitado." : "Profesional activado.");
+    }
+  );
+}
+
+function formEditarProfesional(p) {
+  const form = crear("form", "", "item item-edicion");
+  const campos = crear("div", "", "edicion-campos");
+  const nombre = campo("Nombre", "text", p.nombre, { required: true });
+  const desde = campo("Desde", "time", p.hora_inicio || "09:00", { required: true });
+  const hasta = campo("Hasta", "time", p.hora_fin || "18:00", { required: true });
+  [nombre, desde, hasta].forEach((c) => campos.appendChild(c.label));
+  form.appendChild(campos);
+  form.appendChild(botonesEdicion(() => form.replaceWith(dibujarProfesional(p))));
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    cambiarProfesional(
+      p.id,
+      { nombre: nombre.input.value, hora_inicio: desde.input.value, hora_fin: hasta.input.value },
+      "Profesional actualizado."
+    );
+  });
+  return form;
+}
+
+async function cambiarProfesional(id, datos, mensaje) {
+  try {
+    await api("/admin/profesionales/" + id, { method: "PATCH", body: JSON.stringify(datos) });
+    aviso(mensaje);
+  } catch (err) {
+    aviso(err.message, true);
+  }
+  cargarProfesionalesAdmin();
+}
+
+async function cargarProfesionalesAdmin() {
+  try {
+    const profesionales = await api("/admin/profesionales");
+    const lista = $("lista-profesionales");
+    lista.innerHTML = "";
+    if (!profesionales.length) {
+      lista.appendChild(crear("p", "Todavía no hay profesionales cargados.", "vacio"));
+      return;
+    }
+    profesionales.forEach((p) => lista.appendChild(dibujarProfesional(p)));
+  } catch (err) {
+    aviso(err.message, true);
+  }
+}
+
+$("form-profesional").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    await api("/admin/profesionales", {
+      method: "POST",
+      body: JSON.stringify({
+        nombre: $("prof-nombre").value,
+        hora_inicio: $("prof-desde").value,
+        hora_fin: $("prof-hasta").value,
+      }),
+    });
+    aviso("Profesional agregado.");
+    e.target.reset();
+    cargarProfesionalesAdmin();
+  } catch (err) {
+    aviso(err.message, true);
+  }
+});
+
 // ---------- Inicio ----------
 (async function iniciar() {
   document.title = "Turnos - " + NOMBRE_NEGOCIO;
   $("nombre-negocio").textContent = NOMBRE_NEGOCIO;
+  $("pie-nombre").textContent = NOMBRE_NEGOCIO;
 
   if (location.protocol === "file:") {
     $("vista-auth").hidden = true;
